@@ -15,7 +15,7 @@ limitations under the License.
 
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.2_LEMOER_MOD"
 
 import socket
 import struct
@@ -147,6 +147,7 @@ class MultiPing(object):
         self._time_stamp_size = struct.calcsize("d")
 
         self._receive_has_been_called = False
+        self._ipv4_address_present    = False
         self._ipv6_address_present    = False
 
         # Open an ICMP socket, if we weren't provided with one already
@@ -215,6 +216,7 @@ class MultiPing(object):
             icmp_echo_request = _ICMPV6_ECHO_REQUEST
         else:
             icmp_echo_request = _ICMP_ECHO_REQUEST
+            self._ipv4_address_present = True
 
         # For checksum calculation we require a dummy header, with the checksum
         # field set to zero. This header consists of:
@@ -314,33 +316,34 @@ class MultiPing(object):
 
         """
         pkts = []
-        try:
-            self._sock.settimeout(timeout)
-            while True:
-                p = self._sock.recv(64)
-                # Store the packet and the current time
-                pkts.append((bytearray(p), time.time()))
-                # Continue the loop to receive any additional packets that
-                # may have arrived at this point. Changing the socket to
-                # non-blocking (by setting the timeout to 0), so that we'll
-                # only continue the loop until all current packets have been
-                # read.
-                self._sock.settimeout(0)
-        except socket.timeout:
-            # In the first blocking read with timout, we may not receive
-            # anything. This is not an error, it just means no data was
-            # available in the specified time.
-            pass
-        except socket.error as e:
-            # When we read in non-blocking mode, we may get this error with
-            # errno 11 to indicate that no more data is available. That's ok,
-            # just like the timeout.
-            if e.errno == errno.EWOULDBLOCK:
+        if self._ipv4_address_present:
+            try:
+                self._sock.settimeout(timeout)
+                while True:
+                    p = self._sock.recv(64)
+                    # Store the packet and the current time
+                    pkts.append((bytearray(p), time.time()))
+                    # Continue the loop to receive any additional packets that
+                    # may have arrived at this point. Changing the socket to
+                    # non-blocking (by setting the timeout to 0), so that we'll
+                    # only continue the loop until all current packets have been
+                    # read.
+                    self._sock.settimeout(0)
+            except socket.timeout:
+                # In the first blocking read with timout, we may not receive
+                # anything. This is not an error, it just means no data was
+                # available in the specified time.
                 pass
-            else:
-                # We're not expecting any other socket exceptions, so we
-                # re-raise in that case.
-                raise
+            except socket.error as e:
+                # When we read in non-blocking mode, we may get this error with
+                # errno 11 to indicate that no more data is available. That's ok,
+                # just like the timeout.
+                if e.errno == errno.EWOULDBLOCK:
+                    pass
+                else:
+                    # We're not expecting any other socket exceptions, so we
+                    # re-raise in that case.
+                    raise
 
         if self._ipv6_address_present:
             try:
